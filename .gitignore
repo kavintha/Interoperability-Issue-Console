@@ -1,0 +1,13 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Build output
+target/
+deploy/.env
+.env
+node_modules/
+build/
