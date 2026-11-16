@@ -1,5 +1,5 @@
 # Local development stack for the Interoperability Issue Console (story S1).
-# Run from this folder:  cp .env.example .env  &&  docker compose up -d
+# Run from this folder:  cp .env.sample.example .env.sample  &&  docker compose up -d
 # Everything binds to 127.0.0.1 only, so nothing is exposed to your network.
 name: interop-console
 
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env.sample}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
