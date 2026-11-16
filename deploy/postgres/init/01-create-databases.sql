@@ -1,0 +1,3 @@
+CREATE DATABASE console;
+CREATE DATABASE hapi_a;
+CREATE DATABASE hapi_b;

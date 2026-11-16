@@ -1,0 +1,79 @@
+# Local development stack for the Interoperability Issue Console (story S1).
+# Run from this folder:  cp .env.sample.example .env.sample  &&  docker compose up -d
+# Everything binds to 127.0.0.1 only, so nothing is exposed to your network.
+name: interop-console
+
+# Settings shared by both simulated FHIR servers.
+x-hapi-env: &hapi-env
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+  SPRING_DATASOURCE_DRIVERCLASSNAME: org.postgresql.Driver
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+  HAPI_FHIR_FHIR_VERSION: R4
+  HAPI_FHIR_SUBSCRIPTION_RESTHOOK_ENABLED: "true"
+
+x-hapi: &hapi
+  image: hapiproject/hapi:${HAPI_TAG}
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  # One Postgres instance, three databases: console (our issue DB), hapi_a, hapi_b.
+  # The databases are created by ./postgres/init on the first start only.
+  postgres:
+    image: postgres:${POSTGRES_TAG}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env.sample}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Event stream between connectors and detectors (Valkey is Redis-protocol compatible).
+  valkey:
+    image: valkey/valkey:${VALKEY_TAG}
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - valkeydata:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # System A: the "clean" FHIR server. Later (S2/S3) it gets US Core-style data.
+  hapi-a:
+    <<: *hapi
+    environment:
+      <<: *hapi-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hapi_a
+      HAPI_FHIR_SERVER_ADDRESS: http://localhost:8081/fhir
+    ports:
+      - "127.0.0.1:8081:8080"
+
+  # System B: the second FHIR server. Later (S3) it gets local lab codes and different profiles.
+  hapi-b:
+    <<: *hapi
+    environment:
+      <<: *hapi-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hapi_b
+      HAPI_FHIR_SERVER_ADDRESS: http://localhost:8082/fhir
+    ports:
+      - "127.0.0.1:8082:8080"
+
+volumes:
+  pgdata:
+  valkeydata:
